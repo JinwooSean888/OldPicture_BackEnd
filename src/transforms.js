@@ -1,30 +1,27 @@
-// ✅ 딱 1번만 존재해야 함
-const sharp = require("sharp");
+const axios = require("axios");
+const FormData = require("form-data");
 
-// 기본 필터
-function applyBasicTransform(buffer) {
-  return sharp(buffer).toBuffer();
+/**
+ * ✅ AI 컬러 복원 (Python Flask API 연동)
+ */
+async function applyColorizationTransform(imageBuffer) {
+  try {
+    const formData = new FormData();
+    formData.append("image", imageBuffer, { filename: "input.jpg" });
+
+    const response = await axios.post(
+      "http://localhost:5001/colorize",
+      formData,
+      { headers: formData.getHeaders(), responseType: "arraybuffer" }
+    );
+
+    return Buffer.from(response.data);
+  } catch (error) {
+    console.error("❌ Error during Python model processing:", error);
+    throw new Error("Colorization AI server error");
+  }
 }
 
-// 연필 스케치 효과
-function applyPencilFilter(buffer) {
-  return sharp(buffer)
-    .greyscale()
-    .modulate({
-      brightness: 1.1,
-      contrast: 1.3,
-    })
-    .toBuffer();
-}
-
-// 유화 효과
-function applyOilFilter(buffer) {
-  return sharp(buffer)
-    .blur(2)
-    .modulate({
-      saturation: 1.5,
-    })
-    .toBuffer();
-}
-
-module.exports = { applyBasicTransform, applyPencilFilter, applyOilFilter };
+module.exports = {
+  applyColorizationTransform,
+};
