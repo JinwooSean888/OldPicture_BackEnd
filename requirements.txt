@@ -9,3 +9,4 @@ safetensors
 controlnet-aux
 opencv-python
 Pillow
+xformers

@@ -1,3 +1,4 @@
+
 import numpy as np
 import cv2
 from PIL import Image
@@ -63,5 +64,3 @@ def soft_bleed(pil_img, radius=3, edge_dark=0.06):
     out = blurred.astype(np.float32) - edge_dark * 255 * mask
     out = np.clip(out, 0, 255).astype(np.uint8)
     return Image.fromarray(out)
-
-
