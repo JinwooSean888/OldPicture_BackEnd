@@ -13,7 +13,7 @@ from pipelines.watercolor import watercolor
 from pipelines.hints import canny_hint
 from pipelines.post_watercolor import add_paper_texture, soft_bleed
 from typing import Optional
-
+import numpy as np
 router = APIRouter()
 
 @router.post("/watercolor")
