@@ -1,3 +1,7 @@
+from tensorflow.keras.models import load_model
+
+# FastAPI 파일 업로드용
+from fastapi import File
 
 from fastapi import APIRouter, UploadFile, Form
 from fastapi.responses import FileResponse
@@ -55,4 +59,61 @@ async def watercolor_api(
 @router.get("/watercolor/result/{name}")
 def get_result(name: str):
     path = os.path.join(RESULT_DIR, name)
+    return FileResponse(path, media_type="image/png")
+
+
+# --------------------------------------------------------------------
+# [2️⃣ colorize API: colorization_model_1031.keras 사용]
+# --------------------------------------------------------------------
+# 실제 모델 파일 경로
+MODEL_PATH = r"C:/Advance_Project/OldPicture_Backend/test.keras"
+print("[INFO] 모델 절대 경로:", MODEL_PATH)
+
+try:
+    color_model = load_model(MODEL_PATH)
+    print(f"[✅] Loaded pretrained colorization model: {MODEL_PATH}")
+except Exception as e:
+    print(f"[❌] Failed to load model: {e}")
+    color_model = None
+
+def colorize_image(pil_img: Image.Image) -> Image.Image:
+    """흑백 이미지를 컬러 이미지로 변환"""
+    if color_model is None:
+        raise RuntimeError("Colorization model not loaded.")
+
+    # 입력 전처리: (256,256) 사이즈로 resize 후 0~1 정규화
+    img = pil_img.resize((256, 256))
+    x = np.array(img) / 255.0
+    x = np.expand_dims(x, axis=0)
+
+    # 예측 수행
+    y = color_model.predict(x)
+    y = np.clip(y[0] * 255, 0, 255).astype(np.uint8)
+
+    return Image.fromarray(y)
+
+@router.post("/colorize")
+async def colorize_api(file: UploadFile = File(...)):
+    """
+    📸 사전학습된 colorization_model_1031.keras 모델을 이용해
+    흑백 이미지를 자동으로 컬러화하는 API
+    """
+    # 업로드 이미지 읽기
+    img = Image.open(io.BytesIO(await file.read())).convert("RGB")
+
+    # 모델 실행
+    result_img = colorize_image(img)
+
+    # 결과 저장
+    out_id = f"{uuid.uuid4().hex}.png"
+    out_path = os.path.join(RESULT_DIR, out_id)
+    result_img.save(out_path)
+
+    return {"result_url": f"/api/colorize/result/{out_id}"}
+
+@router.get("/colorize/result/{name}")
+def get_colorize_result(name: str):
+    path = os.path.join(RESULT_DIR, name)
+    if not os.path.exists(path):
+        return {"error": "File not found"}
     return FileResponse(path, media_type="image/png")
