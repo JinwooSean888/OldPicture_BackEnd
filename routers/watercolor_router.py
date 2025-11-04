@@ -6,7 +6,7 @@ from fastapi import File
 from fastapi import APIRouter, UploadFile, Form
 from fastapi.responses import FileResponse
 from PIL import Image
-import io, os, uuid
+import io, os, uuid, cv2
 
 from config import RESULT_DIR
 from pipelines.watercolor import watercolor
@@ -17,7 +17,6 @@ import numpy as np
 from skimage import color
 
 router = APIRouter()
-
 
 from network import unet
 @router.post("/watercolor")
@@ -76,6 +75,7 @@ print("[INFO] 모델 절대 경로:", MODEL_PATH)
 try:
     color_model = unet()
     model_weight = r"C:\Advance_Project\OldPicture_AiModel/colorization_model_1031_weights.h5"
+    # model_weight = r"./colorization_model_1031_weights.h5"
     color_model.load_weights(model_weight)
 
     # color_model = load_model(MODEL_PATH)
@@ -93,7 +93,7 @@ def predict_and_lab2rgb(lab_image):
     pred_img[:, :, 1:] = pred_ab[0]
 
     pred_lab = (pred_img * [100, 255, 255]) - [0, 128, 128]
-    rgb_img = color.lab2rgb(pred_lab.astype(np.uint8))
+    rgb_img = color.lab2rgb(pred_lab)
     return rgb_img
 
 def colorize_image(pil_img: Image.Image) -> Image.Image:
@@ -102,16 +102,13 @@ def colorize_image(pil_img: Image.Image) -> Image.Image:
         raise RuntimeError("Colorization model not loaded.")
 
     # 입력 전처리: (256,256) 사이즈로 resize 후 0~1 정규화
-    img = np.array(pil_img.resize((75, 100)).convert("L"))
-    y = np.array(predict_and_lab2rgb(img))
-    print(y.shape, y)
-    # x = np.array(img) / 255.0
-    # x = np.expand_dims(x, axis=0)
-    # print(x.shape)
-    # # 예측 수행
-    # y = color_model.predict(x)
-    # y = np.clip(y[0] * 255, 0, 255).astype(np.uint8)
-
+    img = np.array(pil_img.resize((75, 100)))/255
+    print(img.shape)
+    H,W = pil_img.size
+    y = predict_and_lab2rgb(img[...,0])
+    y = cv2.resize(y,(H,W))
+    print(y.max())
+    y = np.clip(y * 255, 0, 255).astype(np.uint8)
     return Image.fromarray(y)
 
 @router.post("/colorize")
@@ -122,10 +119,8 @@ async def colorize_api(file: UploadFile = File(...)):
     """
     # 업로드 이미지 읽기
     img = Image.open(io.BytesIO(await file.read())).convert("RGB")
-
     # 모델 실행
     result_img = colorize_image(img)
-
     # 결과 저장
     out_id = f"{uuid.uuid4().hex}.png"
     out_path = os.path.join(RESULT_DIR, out_id)
@@ -136,6 +131,7 @@ async def colorize_api(file: UploadFile = File(...)):
 @router.get("/colorize/result/{name}")
 def get_colorize_result(name: str):
     path = os.path.join(RESULT_DIR, name)
+    print(path)
     if not os.path.exists(path):
         return {"error": "File not found"}
     return FileResponse(path, media_type="image/png")

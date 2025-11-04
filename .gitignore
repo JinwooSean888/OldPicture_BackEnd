@@ -9,3 +9,4 @@ media/
 *.pyd
 *.log
 .DS_Store
+*h5
