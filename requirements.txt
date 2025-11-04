@@ -9,4 +9,5 @@ safetensors
 controlnet-aux
 opencv-python
 Pillow
-xformers
+tensorflow
+python-multipart
